@@ -348,7 +348,11 @@ impl<'a> WorldUIContext<'a> {
                         let registration = match registry.get(type_id) {
                             Some(reg) => reg,
                             None => {
-                                error!("Failed to acquire registration for type id {type_id:?}");
+                                egui::containers::popup::show_tooltip_text(
+                                    ui.ctx(), 
+                                    egui::Id::new("RemoveComponentErrorTooltip"), 
+                                    "Failed to remove component- ensure the component type is registered with the app."
+                                );
                                 return
                             },
                         };
@@ -466,10 +470,22 @@ impl<'a> WorldUIContext<'a> {
             .body_returned
             .unwrap_or(false);
 
-            ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), ui.min_size().y), egui::Layout::top_down(egui::Align::RIGHT), |ui| {
-                if ui.button(egui::RichText::new("✖").color(Color32::RED)).clicked() {
-                    *remove_component = true;
-                }
+            self.world.resource_scope(|_, type_registry: Mut<bevy::reflect::TypeRegistry>| {
+                let type_registry = type_registry.read();
+
+                let enabled = type_registry.get(type_id).is_some();
+
+                ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), ui.min_size().y), egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+                    ui.add_enabled_ui(enabled, |ui| {
+                        let button = ui.button(egui::RichText::new("✖").color(Color32::RED));
+
+                        if button.clicked() {
+                            *remove_component = true;
+                        }
+
+                        button.on_disabled_hover_text("This component cannot be removed because its type is not registered with the app.");
+                    });
+                });
             });
 
             changed
