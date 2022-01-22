@@ -396,7 +396,8 @@ impl<'a> WorldUIContext<'a> {
         }
 
         let id = id.with(component_id);
-        let changed = CollapsingHeader::new(name)
+        let changed = ui.horizontal_top(|ui| {
+            let changed = CollapsingHeader::new(name)
             .id_source(id)
             .show(ui, |ui| {
                 ui.reset_style();
@@ -435,6 +436,15 @@ impl<'a> WorldUIContext<'a> {
             })
             .body_returned
             .unwrap_or(false);
+
+            ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), ui.min_size().y), egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+                if ui.button(egui::RichText::new("✖").color(Color32::RED)).clicked() {
+                    println!("Delete component!");
+                }
+            });
+
+            changed
+        }).inner;
 
         if changed {
             component_ticks.set_changed(self.world.change_tick());
