@@ -316,8 +316,10 @@ impl<'a> WorldUIContext<'a> {
             }
 
             let mut changed = false;
+            let mut removed_component = None;
             for (name, component_id, component_type_id, size) in components {
                 let is_zst = size == 0;
+                let mut remove = false;
                 changed |= unsafe {
                     self.component_ui(
                         ui,
@@ -329,9 +331,35 @@ impl<'a> WorldUIContext<'a> {
                         is_zst,
                         params,
                         id,
+                        &mut remove,
                     )
+                };
+
+                if remove {
+                    removed_component = Some(component_type_id);
                 }
             }
+
+            if let Some(type_id) = removed_component {
+                if let Some(type_id) = type_id {
+                    self.world.resource_scope(|world, type_registry: Mut<bevy::reflect::TypeRegistry>| {
+                        let registry = type_registry.read();
+
+                        let registration = match registry.get(type_id) {
+                            Some(reg) => reg,
+                            None => {
+                                error!("Failed to acquire registration for type id {type_id:?}");
+                                return
+                            },
+                        };
+
+                        let reflect_component = registration.data::<ReflectComponent>().unwrap();
+
+                        reflect_component.remove_component(world, entity);
+                    });
+                }
+            }
+
             changed
         } else {
             false
@@ -351,6 +379,7 @@ impl<'a> WorldUIContext<'a> {
         is_zst: bool,
         params: &WorldInspectorParams,
         id: egui::Id,
+        remove_component: &mut bool,
     ) -> bool {
         let type_id = match component_type_id {
             Some(id) => id,
@@ -439,7 +468,7 @@ impl<'a> WorldUIContext<'a> {
 
             ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), ui.min_size().y), egui::Layout::top_down(egui::Align::RIGHT), |ui| {
                 if ui.button(egui::RichText::new("✖").color(Color32::RED)).clicked() {
-                    println!("Delete component!");
+                    *remove_component = true;
                 }
             });
 
